@@ -69,8 +69,9 @@ def run_target(ip, port, buffer_sizes, use_cuda, gpu_id):
         device = "cpu"
         torch.set_default_device(device)
     
-    # Create agent with listening enabled
-    config = nixl_agent_config(enable_listen_thread=True, backends=["UCX"], listen_port=port)
+    # Create agent with listening enabled (both prog_thread and listen_thread)
+    config = nixl_agent_config(enable_prog_thread=True, enable_listen_thread=True,
+                               backends=["UCX"], listen_port=port)
     agent = nixl_agent("target", config)
     
     logger.info(f"Target listening on {ip}:{port}")
@@ -80,7 +81,7 @@ def run_target(ip, port, buffer_sizes, use_cuda, gpu_id):
     # The listen thread will automatically respond to fetch_remote_metadata calls
     # We need to wait for the initiator to send us their metadata
     # Check for new notifications which indicate the initiator has connected
-    timeout_seconds = 60
+    timeout_seconds = 300  # 5 minutes
     start_time = time.time()
     connected = False
 
@@ -152,8 +153,9 @@ def run_initiator(target_ip, port, buffer_sizes, iterations, warmup, use_cuda, g
         device = "cpu"
         torch.set_default_device(device)
     
-    # Create agent
-    config = nixl_agent_config(backends=["UCX"])
+    # Create agent with both prog_thread and listen_thread enabled
+    config = nixl_agent_config(enable_prog_thread=True, enable_listen_thread=True,
+                               backends=["UCX"], listen_port=0)
     agent = nixl_agent("initiator", config)
 
     logger.info(f"Connecting to target at {target_ip}:{port}")
@@ -178,7 +180,7 @@ def run_initiator(target_ip, port, buffer_sizes, iterations, warmup, use_cuda, g
 
     # Wait for metadata exchange with timeout
     logger.info("Waiting for metadata exchange...")
-    timeout_seconds = 30
+    timeout_seconds = 300  # 5 minutes
     start_time = time.time()
     while not agent.check_remote_metadata("target"):
         if time.time() - start_time > timeout_seconds:
