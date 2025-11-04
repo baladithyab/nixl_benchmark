@@ -237,11 +237,11 @@ def run_initiator(target_ip, port, buffer_sizes, iterations, warmup, use_cuda, g
 
         # Create transfer handle
         transfer_id = f"transfer_{buffer_size}".encode()
-        logger.info(f"Initializing transfer: WRITE from initiator to target, size={format_size(buffer_size)}")
+        logger.info(f"Initializing transfer: READ from target to initiator, size={format_size(buffer_size)}")
 
         try:
             xfer_handle = agent.initialize_xfer(
-                "WRITE",
+                "READ",
                 initiator_descs,
                 target_descs,
                 "target",
