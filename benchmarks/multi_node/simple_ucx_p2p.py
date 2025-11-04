@@ -75,12 +75,36 @@ def run_target(ip, port, buffer_sizes, use_cuda, gpu_id):
     
     logger.info(f"Target listening on {ip}:{port}")
     logger.info(f"Waiting for initiator to connect...")
-    
-    # Wait for initiator metadata
-    while not agent.check_remote_metadata("initiator"):
+    logger.info(f"Target metadata available at {ip}:{port}")
+
+    # The listen thread will automatically respond to fetch_remote_metadata calls
+    # We need to wait for the initiator to send us their metadata
+    # Check for new notifications which indicate the initiator has connected
+    timeout_seconds = 60
+    start_time = time.time()
+    connected = False
+
+    while not connected:
+        if time.time() - start_time > timeout_seconds:
+            logger.error(f"Timeout waiting for initiator after {timeout_seconds}s")
+            logger.error("Initiator may not be connecting properly")
+            return
+
+        # Update and check for notifications from initiator
+        agent.update_notifs()
+        notifs = agent.get_new_notifs()
+
+        # Check if we have metadata from initiator
+        if agent.check_remote_metadata("initiator"):
+            connected = True
+            logger.info("✓ Connected to initiator")
+            break
+
         time.sleep(0.1)
-    
-    logger.info("Connected to initiator")
+
+    if not connected:
+        logger.error("Failed to connect to initiator")
+        return
     
     # Process each buffer size
     for buffer_size in buffer_sizes:
