@@ -122,8 +122,8 @@ def run_target(ip, port, buffer_sizes, use_cuda, gpu_id):
         num_elements = buffer_size // 4
         tensor = torch.zeros(num_elements, dtype=torch.float32, device=device)
         
-        # Register memory
-        reg_descs = agent.register_memory([tensor])
+        # Register memory with UCX backend
+        reg_descs = agent.register_memory([tensor], backends=["UCX"])
         if not reg_descs:
             logger.error("Memory registration failed")
             return
@@ -217,8 +217,8 @@ def run_initiator(target_ip, port, buffer_sizes, iterations, warmup, use_cuda, g
         num_elements = buffer_size // 4
         tensor = torch.ones(num_elements, dtype=torch.float32, device=device)
         
-        # Register memory
-        reg_descs = agent.register_memory([tensor])
+        # Register memory with UCX backend
+        reg_descs = agent.register_memory([tensor], backends=["UCX"])
         if not reg_descs:
             logger.error("Memory registration failed")
             continue
