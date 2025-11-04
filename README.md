@@ -1,203 +1,142 @@
 # NIXL Benchmark Suite
 
-This repository contains benchmark scripts and examples for testing NVIDIA's NIXL (NVIDIA Interconnect eXchange Library) framework, which provides high-performance data transfer capabilities for distributed computing environments.
+Benchmarks for testing [NIXL](https://github.com/ai-dynamo/nixl) (NVIDIA Inference Xfer Library) - a high-performance communication library for AI inference workloads.
 
-## Files Description
-
-### Core Scripts
-
-- **`with_nxl_ucx.py`** - Comprehensive NIXL benchmark using UCX backend that demonstrates:
-  - Agent setup and configuration with UCX transport
-  - Memory registration and management for high-performance data transfer
-  - Bidirectional data transfer operations (READ/WRITE) between initiator and target agents
-  - Inter-agent notification system for coordination
-  - Proper resource cleanup and memory deallocation
-  - Performance validation through multiple transfer cycles
-  - **Communication**: CPU-to-CPU communication using DRAM memory (no GPU involved)
-  - **Data Transfer**: 512 bytes per transfer (2 × 256-byte buffers) with 3 total transfers (~1.5 KB total)
-
-- **`without_nxl.py`** - Baseline benchmark without NIXL for comparison
-
-- **`nixl_gds_example.py`** - Example demonstrating NIXL with GPU Direct Storage integration
-  - **Communication**: Disk-to-GPU communication using VRAM memory (no CPU involved)
-  - **Data Transfer**: 5 GB test input file with buffer set to 5 MB
-### Setup Scripts
-
-- **`install_gds.sh`** - Installs NVIDIA GDS with proper repository setup
-- **`install_gds_alt.sh`** - Alternative installation script with fallback options
-- **`setup_venv.sh`** - Sets up Python virtual environment and dependencies
-
-### Build Scripts
-
-- **`rebuild_nixl_with_gds.sh`** - Comprehensive script to rebuild NIXL with GDS support
-- **`rebuild_nixl_simple.sh`** - Simplified rebuild script for common scenarios
-
-### Diagnostic Tools
-
-- **`check_nixl_plugins.py`** - Diagnoses NIXL installation and available plugins
-- **`nixl_gds_example_fallback.py`** - GDS example with fallback for missing GDS plugin
-
-
-## Prerequisites
-
-### 1. NVIDIA GDS (GPU Direct Storage)
-
-NIXL requires NVIDIA GDS for optimal performance. Install it using the provided script:
-
-```bash
-# Make the script executable
-chmod +x install_gds.sh
-
-# Run the installation script
-./install_gds.sh
-```
-
-If the main script fails, try the alternative installation script:
-
-```bash
-chmod +x install_gds_alt.sh
-./install_gds_alt.sh
-```
-
-**Note**: The installation script will:
-- Add the NVIDIA CUDA repository
-- Update package lists
-- Install the appropriate NVIDIA GDS package
-- Clean up temporary files
-
-### 2. Python Environment
-
-Set up a Python virtual environment and install dependencies:
-
-```bash
-# Make the setup script executable
-chmod +x setup_venv.sh
-
-# Run the setup script
-./setup_venv.sh
-
-source venv/bin/activate
-
-```
-
-## Running the Benchmarks
-
-### Basic NIXL Test
+## 🚀 Quick Start
 
 ```bash
 # Activate virtual environment
+source venv/bin/activate
 
-# Run the comprehensive NIXL test
-python with_nxl_ucx.py
+# Verify NIXL setup
+python3 verify_nixl_setup.py
+
+# Run storage benchmarks (GDS or POSIX)
+python3 benchmarks/storage/simple_gds_storage.py --file /tmp/test.dat
 ```
 
-### Baseline Comparison
+## 📁 Repository Structure
+
+```
+nixl_benchmark/
+├── benchmarks/
+│   ├── single_node/           # Single-node benchmarks
+│   ├── multi_node/            # Multi-node benchmarks
+│   ├── storage/               # Storage benchmarks (GDS, POSIX)
+│   └── utils/                 # Helper functions
+│
+├── verify_nixl_setup.py       # Setup verification
+├── BENCHMARKS.md              # Detailed benchmark guide
+├── NIXL_GUIDE.md              # Comprehensive NIXL documentation
+│
+├── nixl/                      # NIXL submodule (v0.7.0)
+├── archive/                   # Original example scripts
+└── venv/                      # Python virtual environment
+```
+
+## 📊 Available Benchmarks
+
+### Storage Benchmarks (Recommended for Local Testing)
+
+**GDS (GPU Direct Storage)** - GPU-to-storage transfers
+```bash
+python3 benchmarks/storage/simple_gds_storage.py --file /tmp/test.dat --buffer_sizes 1MB,16MB
+```
+
+**POSIX** - CPU-to-storage transfers
+```bash
+python3 benchmarks/storage/simple_posix_storage.py --file /tmp/test.dat --buffer_sizes 4KB,1MB
+```
+
+### Multi-Node Benchmarks
+
+**UCX Point-to-Point** - Network transfers between nodes
+```bash
+# On Node 1 (target)
+python3 benchmarks/multi_node/simple_ucx_p2p.py --mode target --ip 192.168.1.100
+
+# On Node 2 (initiator)
+python3 benchmarks/multi_node/simple_ucx_p2p.py --mode initiator --ip 192.168.1.100
+```
+
+See **[BENCHMARKS.md](BENCHMARKS.md)** for detailed usage.
+
+## 📚 Documentation
+
+- **[BENCHMARKS.md](BENCHMARKS.md)** - How to run benchmarks, command-line arguments, test scenarios
+- **[NIXL_GUIDE.md](NIXL_GUIDE.md)** - Complete NIXL architecture, backends, API reference
+
+## 🔧 Setup
+
+### Prerequisites
+- Python 3.7+
+- PyTorch with CUDA support (for GPU benchmarks)
+- NIXL library
+- NVIDIA GDS (for GDS benchmarks)
+
+### Installation
 
 ```bash
-# Run baseline test without NIXL
-python without_nixl.py
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install PyTorch with CUDA support
+pip install torch --index-url https://download.pytorch.org/whl/cu124
+
+# Install NIXL
+pip install nixl
+
+# Verify installation
+python3 verify_nixl_setup.py
 ```
 
-### GDS Example
+## 🎯 What is NIXL?
 
-### Rebuilding NIXL with GDS Support
+NIXL (NVIDIA Inference Xfer Library) is a high-performance communication library designed for AI inference workloads. It provides:
 
-If you need GDS functionality, you can rebuild NIXL with GDS support:
+- **Unified API** for different memory types (CPU, GPU, Storage)
+- **Multiple backends** (UCX, GDS, POSIX, GPUNetIO, Mooncake, etc.)
+- **High performance** with RDMA, GPU Direct, and optimized transfers
+- **Flexibility** through modular plugin architecture
 
+### Common Use Cases
+- LLM KV-cache sharing across nodes
+- Model checkpoint loading/saving
+- Distributed inference pipelines
+- GPU-to-storage offloading
 
-**Prerequisites for rebuilding:**
-- NIXL source code (set `NIXL_SOURCE_URL` or place in `../nixl`, `../../nixl`, or `./nixl`)
-  ` git clone https://github.com/ai-dynamo/nixl.git`
-- CUDA installation (automatically detected)
-- NVIDIA GDS (installed via `./install_gds.sh`)
-- Build tools (automatically installed if missing)
+## 🏗️ Building NIXL from Source
 
+The `nixl/` directory contains the NIXL source as a git submodule (tag v0.7.0).
 
-```bash
-# Navigate to the NIXL source directory
+For build instructions, see the [original setup notes](archive/old_setup/) or the [official NIXL repository](https://github.com/ai-dynamo/nixl).
 
+## 📦 What's in the Archive?
 
-# Install in development mode to your virtual environment
+The `archive/` directory contains original example scripts and setup files from before the repository reorganization:
 
-cd ~/nixl_benchmark/nixl/
+- **archive/old_scripts/** - Original NIXL examples (with_nxl_ucx.py, nixl_gds_example.py, etc.)
+- **archive/old_setup/** - Installation and build scripts
 
-sudo update-alternatives --install /usr/local/cuda cuda /usr/local/cuda-12.8 128
+These are kept for reference. The new simplified benchmarks in the root directory should be used instead.
 
-# cd nixl_build/nixl_source && rm -rf build && 
-sudo apt install meson
-pip install --upgrade meson
+## 🤝 Contributing
 
-sudo apt update && sudo apt install -y libucx-dev ucx-utils
+Contributions are welcome! When adding new benchmarks:
 
-pip install pybind11
+1. Keep them simple and focused
+2. Base them on working NIXL patterns
+3. Include clear documentation
+4. Test with multiple buffer sizes
+5. Add proper error handling
 
-cd /tmp && wget https://github.com/openucx/ucx/releases/download/v1.17.0/ucx-1.17.0.tar.gz
-tar -xzf ucx-1.17.0.tar.gz && cd ucx-1.17.0
+## 📄 License
 
-sudo apt remove -y libucx-dev libucx0 ucx-utils && sudo apt install -y build-essential autoconf automake libtool
+Apache License 2.0 - See individual file headers for details.
 
-./configure --prefix=/usr/local --with-cuda=/usr/local/cuda-12.8 --enable-optimizations --disable-logging --disable-debug --disable-assertions --disable-params-check
+## 🔗 Links
 
-
-
-make -j$(nproc)
-
-sudo make install
-
-sudo ldconfig
-
-cd ~/nixl_benchmark/nixl && export LD_LIBRARY_PATH=/usr/local/cuda-12.8/targets/x86_64-linux/lib:$LD_LIBRARY_PATH && meson setup build --prefix=/usr/local -Dgds_path=/usr/local/cuda-12.8 --wipe
-
-ninja -C build
-
-sudo ninja -C build install
-sudo ldconfig
-
-
-
-```
-
-**Verify GDS plugin availability:**
-
-After installation, run the diagnostic script to confirm GDS support:
-
-```bash
-export LD_LIBRARY_PATH=/usr/local/lib/x86_64-linux-gnu:/usr/local/lib:$LD_LIBRARY_PATH && export NIXL_PLUGIN_DIR=/usr/local/lib/x86_64-linux-gnu/plugins && python check_nixl_plugins.py
-```
-
-You should now see `"GDS"` in the available plugins list.
-
-## Dependencies
-
-See `requirements.txt` for Python package dependencies:
-- numpy
-- torch
-- nixl (NIXL Python bindings)
-
-
-## test gds 
-
-- First generate the test file 
-```bash
-export LD_LIBRARY_PATH=/usr/local/lib/x86_64-linux-gnu:/usr/local/lib:$LD_LIBRARY_PATH && export NIXL_PLUGIN_DIR=/usr/local/lib/x86_64-linux-gnu/plugins 
-python create_test_file.py
-python nixl_gds_example.py test_file_5.0gb.dat full
-python nixl_gds_example_async.py test_file_5.0gb.dat full
-
-```
-
-``
-
-
-## License
-
-This project is licensed under the Apache License, Version 2.0. See the license headers in individual files for details.
-
-## Contributing
-
-When contributing to this benchmark suite:
-1. Ensure all prerequisites are documented
-2. Test on multiple Ubuntu versions if possible
-3. Update installation scripts for new dependencies
-4. Add appropriate error handling and troubleshooting information 
+- **NIXL Repository**: https://github.com/ai-dynamo/nixl
+- **This Fork**: https://github.com/baladithyab/nixl_benchmark
 
