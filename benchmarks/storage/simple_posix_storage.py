@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Simple GDS Storage Benchmark
-Tests GPU-to-Storage transfers using GDS backend.
-Based on working patterns from nixl_gds_example.py
+Simple POSIX Storage Benchmark
+Tests CPU-to-Storage transfers using POSIX backend.
 """
 
 import argparse
@@ -32,31 +31,23 @@ def parse_size(size_str):
     return int(size_str)
 
 
-def run_gds_test(agent, agent_name, file_path, buffer_size, iterations, warmup, use_cuda=True):
-    """Run GDS read/write test for a specific buffer size."""
-
-    # Allocate GPU buffers
-    if use_cuda and torch.cuda.is_available():
-        device = torch.device("cuda:0")
-        num_elements = buffer_size // 4  # float32
-        write_tensor = torch.ones(num_elements, dtype=torch.float32, device=device)
-        read_tensor = torch.zeros(num_elements, dtype=torch.float32, device=device)
-        mem_type = "VRAM"
-    else:
-        device = torch.device("cpu")
-        num_elements = buffer_size // 4
-        write_tensor = torch.ones(num_elements, dtype=torch.float32, device=device)
-        read_tensor = torch.zeros(num_elements, dtype=torch.float32, device=device)
-        mem_type = "DRAM"
-
-    # Register GPU memory with NIXL
+def run_posix_test(agent, agent_name, file_path, buffer_size, iterations, warmup):
+    """Run POSIX read/write test for a specific buffer size."""
+    
+    # Allocate CPU buffers
+    device = torch.device("cpu")
+    num_elements = buffer_size // 4  # float32
+    write_tensor = torch.ones(num_elements, dtype=torch.float32, device=device)
+    read_tensor = torch.zeros(num_elements, dtype=torch.float32, device=device)
+    
+    # Register CPU memory with NIXL
     write_reg = agent.register_memory([write_tensor])
     read_reg = agent.register_memory([read_tensor])
-
+    
     if not write_reg or not read_reg:
-        print("Failed to register GPU memory")
+        print("Failed to register CPU memory")
         return None
-
+    
     write_xfer = write_reg.trim()
     read_xfer = read_reg.trim()
     
@@ -65,7 +56,7 @@ def run_gds_test(agent, agent_name, file_path, buffer_size, iterations, warmup, 
     if fd < 0:
         print(f"Failed to open file: {file_path}")
         return None
-
+    
     # Register file with NIXL
     file_reg_descs = agent.get_reg_descs([(0, buffer_size, fd, "file")], "FILE")
     file_reg = agent.register_memory(file_reg_descs)
@@ -73,28 +64,27 @@ def run_gds_test(agent, agent_name, file_path, buffer_size, iterations, warmup, 
         print("Failed to register file")
         os.close(fd)
         return None
-
+    
     file_xfer = file_reg.trim()
-
-    # Create transfer handles (GPU <-> Storage)
+    
+    # Create transfer handles (CPU <-> Storage)
     # For local storage transfers, use the agent's own name
-    # GDS doesn't support notifications, so use empty notif_msg
+    # POSIX doesn't support notifications, so use empty notif_msg
     write_handle = agent.initialize_xfer("WRITE", write_xfer, file_xfer, agent_name)
     read_handle = agent.initialize_xfer("READ", read_xfer, file_xfer, agent_name)
-
+    
     if not write_handle or not read_handle:
         print("Failed to create transfer handles")
         agent.deregister_memory(file_reg)
         os.close(fd)
         return None
     
-    # Warmup - WRITE
+    # Warmup
     for _ in range(warmup):
         state = agent.transfer(write_handle)
         if state == "ERR":
             print("Warmup write failed")
-            os.close(fd)
-            return None
+            break
         
         while True:
             state = agent.check_xfer_state(write_handle)
@@ -102,16 +92,12 @@ def run_gds_test(agent, agent_name, file_path, buffer_size, iterations, warmup, 
                 break
             elif state == "ERR":
                 print("Warmup write error")
-                os.close(fd)
-                return None
-    
-    # Warmup - READ
-    for _ in range(warmup):
+                break
+        
         state = agent.transfer(read_handle)
         if state == "ERR":
             print("Warmup read failed")
-            os.close(fd)
-            return None
+            break
         
         while True:
             state = agent.check_xfer_state(read_handle)
@@ -119,8 +105,7 @@ def run_gds_test(agent, agent_name, file_path, buffer_size, iterations, warmup, 
                 break
             elif state == "ERR":
                 print("Warmup read error")
-                os.close(fd)
-                return None
+                break
     
     # Measure WRITE
     write_latencies = []
@@ -180,93 +165,76 @@ def run_gds_test(agent, agent_name, file_path, buffer_size, iterations, warmup, 
     agent.deregister_memory(file_reg)
     os.close(fd)
     
-    # Calculate metrics
-    if not write_latencies or not read_latencies:
-        return None
+    # Calculate statistics
+    import statistics
     
-    total_bytes = buffer_size * iterations
+    write_mean = statistics.mean(write_latencies)
+    write_p50 = statistics.median(write_latencies)
+    write_p99 = sorted(write_latencies)[int(len(write_latencies) * 0.99)]
+    write_bandwidth = (buffer_size * iterations) / write_total_time / (1024**3)  # GB/s
     
-    write_bandwidth = (total_bytes / write_total_time) / 1e9
-    write_mean = sum(write_latencies) / len(write_latencies)
-    write_sorted = sorted(write_latencies)
-    write_p50 = write_sorted[len(write_sorted) // 2]
-    write_p99 = write_sorted[int(len(write_sorted) * 0.99)]
-    
-    read_bandwidth = (total_bytes / read_total_time) / 1e9
-    read_mean = sum(read_latencies) / len(read_latencies)
-    read_sorted = sorted(read_latencies)
-    read_p50 = read_sorted[len(read_sorted) // 2]
-    read_p99 = read_sorted[int(len(read_sorted) * 0.99)]
+    read_mean = statistics.mean(read_latencies)
+    read_p50 = statistics.median(read_latencies)
+    read_p99 = sorted(read_latencies)[int(len(read_latencies) * 0.99)]
+    read_bandwidth = (buffer_size * iterations) / read_total_time / (1024**3)  # GB/s
     
     return {
         'buffer_size': buffer_size,
-        'write_bandwidth_gbps': write_bandwidth,
         'write_mean_us': write_mean,
         'write_p50_us': write_p50,
         'write_p99_us': write_p99,
-        'read_bandwidth_gbps': read_bandwidth,
+        'write_bandwidth_gbps': write_bandwidth,
         'read_mean_us': read_mean,
         'read_p50_us': read_p50,
         'read_p99_us': read_p99,
+        'read_bandwidth_gbps': read_bandwidth,
     }
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Simple GDS Storage Benchmark')
+    parser = argparse.ArgumentParser(description='Simple POSIX Storage Benchmark')
     parser.add_argument('--file', type=str, required=True,
                        help='File path for testing')
-    parser.add_argument('--buffer_sizes', type=str, default='1MB,16MB,256MB',
+    parser.add_argument('--buffer_sizes', type=str, default='4KB,1MB,16MB',
                        help='Comma-separated buffer sizes')
     parser.add_argument('--iterations', type=int, default=50,
                        help='Number of iterations per buffer size')
     parser.add_argument('--warmup', type=int, default=5,
                        help='Number of warmup iterations')
-    parser.add_argument('--cuda', action='store_true',
-                       help='Use CUDA (GPU) memory instead of CPU')
-    parser.add_argument('--gpu', type=int, default=0,
-                       help='GPU device ID (default: 0)')
-
+    
     args = parser.parse_args()
-
-    # Set GPU device if using CUDA
-    if args.cuda:
-        if not torch.cuda.is_available():
-            print("ERROR: CUDA not available")
-            return
-        torch.cuda.set_device(args.gpu)
-        print(f"Using GPU: {torch.cuda.get_device_name(args.gpu)}")
     
     # Parse buffer sizes
     buffer_sizes = [parse_size(s.strip()) for s in args.buffer_sizes.split(',')]
     
-    # Create agent with GDS backend
+    # Create agent with POSIX backend
     agent_config = nixl_agent_config(backends=[])
-    agent = nixl_agent("gds_test", agent_config)
+    agent = nixl_agent("posix_test", agent_config)
     
-    # Check for GDS plugin
+    # Check for POSIX plugin
     plugins = agent.get_plugin_list()
-    if "GDS" not in plugins:
-        print("ERROR: GDS plugin not available")
+    if "POSIX" not in plugins:
+        print("ERROR: POSIX plugin not available")
         print(f"Available plugins: {plugins}")
         return
     
-    # Create GDS backend
-    agent.create_backend("GDS")
+    # Create POSIX backend
+    agent.create_backend("POSIX")
     
     print("="*80)
-    print("GDS Storage Benchmark")
+    print("POSIX Storage Benchmark")
     print("="*80)
-    print(f"Memory: {'GPU (VRAM)' if args.cuda else 'CPU (DRAM)'}")
+    print(f"Memory: CPU (DRAM)")
     print(f"File: {args.file}")
     print(f"Buffer sizes: {', '.join(format_size(s) for s in buffer_sizes)}")
     print(f"Iterations: {args.iterations} (warmup: {args.warmup})")
     print("="*80)
-
+    
     results = []
     for buffer_size in buffer_sizes:
         print(f"\nTesting {format_size(buffer_size)}...", flush=True)
-
-        result = run_gds_test(agent, "gds_test", args.file, buffer_size, args.iterations, args.warmup, args.cuda)
+        
+        result = run_posix_test(agent, "posix_test", args.file, buffer_size, args.iterations, args.warmup)
         
         if result:
             results.append(result)
