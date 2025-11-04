@@ -249,7 +249,8 @@ def run_initiator(target_ip, port, buffer_sizes, iterations, warmup, use_cuda, g
                 initiator_descs,
                 target_descs,
                 "target",
-                transfer_id
+                transfer_id,
+                backends=["UCX"]  # Explicitly specify UCX backend
             )
         except Exception as e:
             logger.error(f"initialize_xfer raised exception: {e}")
