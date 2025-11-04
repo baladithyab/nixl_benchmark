@@ -9,10 +9,16 @@ import argparse
 import time
 import torch
 import socket
+import os
 from nixl._api import nixl_agent, nixl_agent_config
 from nixl.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Set UCX environment variables for TCP transport
+os.environ.setdefault('UCX_TLS', 'tcp,self')
+os.environ.setdefault('UCX_NET_DEVICES', 'all')
+os.environ.setdefault('UCX_TCP_CM_REUSEADDR', 'y')
 
 
 def check_tcp_connectivity(ip, port, timeout=5):
