@@ -8,10 +8,33 @@ Based on working patterns from nixl blocking_send_recv_example.py
 import argparse
 import time
 import torch
+import socket
 from nixl._api import nixl_agent, nixl_agent_config
 from nixl.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def check_tcp_connectivity(ip, port, timeout=5):
+    """Check if we can connect to the target IP:port via TCP."""
+    try:
+        logger.info(f"Checking TCP connectivity to {ip}:{port}...")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((ip, port))
+        sock.close()
+        if result == 0:
+            logger.info(f"✓ TCP connection to {ip}:{port} successful")
+            return True
+        else:
+            logger.error(f"✗ TCP connection to {ip}:{port} failed (error code: {result})")
+            return False
+    except socket.timeout:
+        logger.error(f"✗ TCP connection to {ip}:{port} timed out after {timeout}s")
+        return False
+    except Exception as e:
+        logger.error(f"✗ TCP connection to {ip}:{port} failed: {e}")
+        return False
 
 
 def format_size(bytes_val):
@@ -108,18 +131,39 @@ def run_initiator(target_ip, port, buffer_sizes, iterations, warmup, use_cuda, g
     # Create agent
     config = nixl_agent_config(backends=["UCX"])
     agent = nixl_agent("initiator", config)
-    
+
     logger.info(f"Connecting to target at {target_ip}:{port}")
-    
+
+    # First check basic TCP connectivity
+    if not check_tcp_connectivity(target_ip, port, timeout=5):
+        logger.error(f"Cannot reach target at {target_ip}:{port}")
+        logger.error("Please ensure:")
+        logger.error("  1. Target is running and listening on the correct port")
+        logger.error("  2. Firewall allows connections on this port")
+        logger.error("  3. IP address is correct")
+        return
+
     # Fetch target metadata and send local metadata
-    agent.fetch_remote_metadata("target", target_ip, port)
-    agent.send_local_metadata(target_ip, port)
-    
-    # Wait for metadata exchange
+    logger.info("Fetching target metadata...")
+    try:
+        agent.fetch_remote_metadata("target", target_ip, port)
+        agent.send_local_metadata(target_ip, port)
+    except Exception as e:
+        logger.error(f"Metadata exchange failed: {e}")
+        return
+
+    # Wait for metadata exchange with timeout
+    logger.info("Waiting for metadata exchange...")
+    timeout_seconds = 30
+    start_time = time.time()
     while not agent.check_remote_metadata("target"):
+        if time.time() - start_time > timeout_seconds:
+            logger.error(f"Metadata exchange timed out after {timeout_seconds}s")
+            logger.error("Target may not be responding properly")
+            return
         time.sleep(0.1)
-    
-    logger.info("Connected to target")
+
+    logger.info("✓ Connected to target")
     
     print("\n" + "="*80)
     print("UCX Point-to-Point Benchmark (Initiator)")
