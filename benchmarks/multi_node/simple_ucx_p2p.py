@@ -79,15 +79,10 @@ def run_target(ip, port, buffer_sizes, use_cuda, gpu_id):
         device = "cpu"
         torch.set_default_device(device)
     
-    # Create agent with listening enabled (both prog_thread and listen_thread)
-    # Start with empty backends list and explicitly create UCX backend
+    # Create agent with UCX backend (like blocking_send_recv_example)
     config = nixl_agent_config(enable_prog_thread=True, enable_listen_thread=True,
-                               backends=[], listen_port=port)
+                               backends=['UCX'], listen_port=port)
     agent = nixl_agent("target", config)
-
-    # Explicitly create UCX backend (like in NIXL storage example)
-    agent.create_backend("UCX")
-    logger.info("Created UCX backend")
     
     logger.info(f"Target listening on {ip}:{port}")
     logger.info(f"Waiting for initiator to connect...")
@@ -168,15 +163,10 @@ def run_initiator(target_ip, port, buffer_sizes, iterations, warmup, use_cuda, g
         device = "cpu"
         torch.set_default_device(device)
     
-    # Create agent with both prog_thread and listen_thread enabled
-    # Start with empty backends list and explicitly create UCX backend
+    # Create agent with UCX backend (like blocking_send_recv_example)
     config = nixl_agent_config(enable_prog_thread=True, enable_listen_thread=True,
-                               backends=[], listen_port=0)
+                               backends=['UCX'], listen_port=0)
     agent = nixl_agent("initiator", config)
-
-    # Explicitly create UCX backend (like in NIXL storage example)
-    agent.create_backend("UCX")
-    logger.info("Created UCX backend")
 
     logger.info(f"Connecting to target at {target_ip}:{port}")
 
