@@ -26,10 +26,12 @@ def format_size(bytes_val):
 def parse_size(size_str):
     """Parse size string like '4KB', '1MB' to bytes."""
     size_str = size_str.upper().strip()
-    units = {'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3}
-    for unit, multiplier in units.items():
+    # Check units in order from longest to shortest to avoid partial matches
+    units = [('GB', 1024**3), ('MB', 1024**2), ('KB', 1024), ('B', 1)]
+    for unit, multiplier in units:
         if size_str.endswith(unit):
-            return int(float(size_str[:-len(unit)]) * multiplier)
+            num_str = size_str[:-len(unit)].strip()
+            return int(float(num_str) * multiplier)
     return int(size_str)
 
 
