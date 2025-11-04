@@ -5,20 +5,21 @@ Tests inter-node transfers with UCX backend.
 Based on working patterns from nixl blocking_send_recv_example.py
 """
 
+# IMPORTANT: Set UCX environment variables BEFORE importing NIXL
+# UCX reads these when the backend is initialized
+import os
+os.environ.setdefault('UCX_TLS', 'tcp,self')
+os.environ.setdefault('UCX_NET_DEVICES', 'all')
+os.environ.setdefault('UCX_TCP_CM_REUSEADDR', 'y')
+
 import argparse
 import time
 import torch
 import socket
-import os
 from nixl._api import nixl_agent, nixl_agent_config
 from nixl.logging import get_logger
 
 logger = get_logger(__name__)
-
-# Set UCX environment variables for TCP transport
-os.environ.setdefault('UCX_TLS', 'tcp,self')
-os.environ.setdefault('UCX_NET_DEVICES', 'all')
-os.environ.setdefault('UCX_TCP_CM_REUSEADDR', 'y')
 
 
 def check_tcp_connectivity(ip, port, timeout=5):
