@@ -8,9 +8,12 @@ Based on working patterns from nixl blocking_send_recv_example.py
 # IMPORTANT: Set UCX environment variables BEFORE importing NIXL
 # UCX reads these when the backend is initialized
 import os
-os.environ.setdefault('UCX_TLS', 'tcp,self')
-os.environ.setdefault('UCX_NET_DEVICES', 'all')
+os.environ.setdefault('UCX_TLS', 'tcp')
+# Don't set UCX_NET_DEVICES - let UCX auto-detect the right interface
+# Setting it to 'all' can cause it to prefer loopback
 os.environ.setdefault('UCX_TCP_CM_REUSEADDR', 'y')
+# Force UCX to use non-loopback interfaces for remote connections
+os.environ.setdefault('UCX_TCP_PREFER_DEFAULT', 'n')
 
 import argparse
 import time
