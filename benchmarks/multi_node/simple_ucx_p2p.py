@@ -231,18 +231,30 @@ def run_initiator(target_ip, port, buffer_sizes, iterations, warmup, use_cuda, g
         
         target_descs = agent.deserialize_descs(notifs["target"][0])
         
+        # Debug: Check memory types
+        logger.info(f"Initiator descs type: {type(initiator_descs)}")
+        logger.info(f"Target descs type: {type(target_descs)}")
+
         # Create transfer handle
         transfer_id = f"transfer_{buffer_size}".encode()
-        xfer_handle = agent.initialize_xfer(
-            "WRITE",
-            initiator_descs,
-            target_descs,
-            "target",
-            transfer_id
-        )
-        
+        logger.info(f"Initializing transfer: WRITE from initiator to target, size={format_size(buffer_size)}")
+
+        try:
+            xfer_handle = agent.initialize_xfer(
+                "WRITE",
+                initiator_descs,
+                target_descs,
+                "target",
+                transfer_id
+            )
+        except Exception as e:
+            logger.error(f"initialize_xfer raised exception: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
+
         if not xfer_handle:
-            logger.error("Failed to create transfer handle")
+            logger.error("Failed to create transfer handle (returned None/False)")
             continue
         
         # Warmup
