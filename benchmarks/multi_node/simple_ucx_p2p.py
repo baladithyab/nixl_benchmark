@@ -80,9 +80,14 @@ def run_target(ip, port, buffer_sizes, use_cuda, gpu_id):
         torch.set_default_device(device)
     
     # Create agent with listening enabled (both prog_thread and listen_thread)
+    # Start with empty backends list and explicitly create UCX backend
     config = nixl_agent_config(enable_prog_thread=True, enable_listen_thread=True,
-                               backends=["UCX"], listen_port=port)
+                               backends=[], listen_port=port)
     agent = nixl_agent("target", config)
+
+    # Explicitly create UCX backend (like in NIXL storage example)
+    agent.create_backend("UCX")
+    logger.info("Created UCX backend")
     
     logger.info(f"Target listening on {ip}:{port}")
     logger.info(f"Waiting for initiator to connect...")
@@ -122,8 +127,8 @@ def run_target(ip, port, buffer_sizes, use_cuda, gpu_id):
         num_elements = buffer_size // 4
         tensor = torch.zeros(num_elements, dtype=torch.float32, device=device)
         
-        # Register memory with UCX backend
-        reg_descs = agent.register_memory([tensor], backends=["UCX"])
+        # Register memory with DRAM memory type (like NIXL storage example)
+        reg_descs = agent.register_memory([tensor], mem_type="DRAM")
         if not reg_descs:
             logger.error("Memory registration failed")
             return
@@ -164,9 +169,14 @@ def run_initiator(target_ip, port, buffer_sizes, iterations, warmup, use_cuda, g
         torch.set_default_device(device)
     
     # Create agent with both prog_thread and listen_thread enabled
+    # Start with empty backends list and explicitly create UCX backend
     config = nixl_agent_config(enable_prog_thread=True, enable_listen_thread=True,
-                               backends=["UCX"], listen_port=0)
+                               backends=[], listen_port=0)
     agent = nixl_agent("initiator", config)
+
+    # Explicitly create UCX backend (like in NIXL storage example)
+    agent.create_backend("UCX")
+    logger.info("Created UCX backend")
 
     logger.info(f"Connecting to target at {target_ip}:{port}")
 
@@ -217,8 +227,8 @@ def run_initiator(target_ip, port, buffer_sizes, iterations, warmup, use_cuda, g
         num_elements = buffer_size // 4
         tensor = torch.ones(num_elements, dtype=torch.float32, device=device)
         
-        # Register memory with UCX backend
-        reg_descs = agent.register_memory([tensor], backends=["UCX"])
+        # Register memory with DRAM memory type (like NIXL storage example)
+        reg_descs = agent.register_memory([tensor], mem_type="DRAM")
         if not reg_descs:
             logger.error("Memory registration failed")
             continue
