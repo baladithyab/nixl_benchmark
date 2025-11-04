@@ -47,7 +47,7 @@ def run_target(ip, port, buffer_sizes, use_cuda, gpu_id):
         torch.set_default_device(device)
     
     # Create agent with listening enabled
-    config = nixl_agent_config(enable_listen=True, backends=["UCX"], listen_port=port)
+    config = nixl_agent_config(enable_listen_thread=True, backends=["UCX"], listen_port=port)
     agent = nixl_agent("target", config)
     
     logger.info(f"Target listening on {ip}:{port}")
